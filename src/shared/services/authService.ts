@@ -1,0 +1,27 @@
+import api from './api'
+
+export const authService = {
+    registro: (data: {
+        cedula: string
+        nombre: string
+        correo: string
+        contrasena: string
+        telefono: string
+        planId: number 
+    }) => api.post('/api/pos/usuario/save', data),
+
+    login: (correo: string, contrasena: string) =>
+        api.post('/api/pos/usuario/login', { correo, contrasena }),
+
+    buscar: (cedula: string) =>
+        api.get(`/api/pos/usuario/buscar/${cedula}`),
+
+    eliminar: (cedula: string) =>
+        api.delete(`/api/pos/usuario/eliminar/${cedula}`),
+
+    forgotPassword: (email: string) =>
+        api.post('/api/pos/usuario/forgot-password', { email }),
+
+    resetPassword: (token: string, nuevaContrasena: string) =>
+        api.post('/api/pos/usuario/reset-password', { token, nuevaContrasena }),
+}
