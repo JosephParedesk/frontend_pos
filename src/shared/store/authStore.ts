@@ -7,6 +7,7 @@ interface Usuario {
     correo: string
     rol: string
     planId?: number
+    empresaId?: string
 }
 
 interface AuthStore {
@@ -23,31 +24,31 @@ export const useAuthStore = create<AuthStore>((set) => ({
     token: localStorage.getItem('token'),
 
     inicializar: () => {
-        const token = localStorage.getItem('token')
-        if (token) {
-            try {
-                const decoded: any = jwtDecode(token)
-                const ahora = Date.now() / 1000
-                if (decoded.exp && decoded.exp < ahora) {
-                    localStorage.removeItem('token')
-                    return
-                }
-                set({
-                    token,
-                    usuario: {
-                        cedula: decoded.cedula,
-                        nombre: decoded.nombre,
-                        correo: decoded.sub,
-                        rol: decoded.rol,
-                        planId: decoded.planId,
-                    }
-                })
-            } catch {
+    const token = localStorage.getItem('token')
+    if (token) {
+        try {
+            const decoded: any = jwtDecode(token)
+            const ahora = Date.now() / 1000
+            if (decoded.exp && decoded.exp < ahora) {
                 localStorage.removeItem('token')
+                return
             }
+            set({
+                token,
+                usuario: {
+                    cedula: decoded.cedula,
+                    nombre: decoded.nombre,
+                    correo: decoded.sub,
+                    rol: decoded.rol,
+                    planId: decoded.planId,
+                    empresaId: decoded.empresaId, // ← agrega esto
+                }
+            })
+        } catch {
+            localStorage.removeItem('token')
         }
-    },
-
+    }
+},
     setUsuario: (usuario) => set({ usuario }),
 
     setToken: (token) => {

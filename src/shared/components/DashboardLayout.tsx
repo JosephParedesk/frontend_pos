@@ -16,7 +16,17 @@ const todosLosModulos = [
     { key: '/ventas', icon: <ShoppingCartOutlined />, label: 'Ventas / POS', planes: [1, 2, 3] },
     { key: '/inventario', icon: <InboxOutlined />, label: 'Inventario', planes: [1, 2, 3] },
     { key: '/clientes', icon: <TeamOutlined />, label: 'Clientes', planes: [1, 2, 3] },
-    { key: '/proveedores', icon: <CarOutlined />, label: 'Proveedores', planes: [2, 3] },
+    {
+        key: 'compras',
+        icon: <CarOutlined />,
+        label: 'Compras',
+        planes: [2, 3],
+        children: [
+            { key: '/compras/proveedores', label: 'Proveedores', planes: [2, 3] },
+            { key: '/compras/ordenes', label: 'Órdenes de compra', planes: [2, 3] },
+            { key: '/compras/cuentas-por-pagar', label: 'Cuentas por pagar', planes: [2, 3] },
+        ]
+    },
     { key: '/contabilidad', icon: <AccountBookOutlined />, label: 'Contabilidad', planes: [2, 3] },
     { key: '/facturacion', icon: <FileTextOutlined />, label: 'Facturación', planes: [2, 3] },
     { key: '/nomina', icon: <UserOutlined />, label: 'Nómina', planes: [3] },
@@ -33,6 +43,25 @@ export default function DashboardLayout() {
 
     const menuItems = todosLosModulos.map((modulo) => {
         const tieneAcceso = modulo.planes.includes(planId)
+
+        if (modulo.children) {
+            return {
+                key: modulo.key,
+                icon: modulo.icon,
+                label: modulo.label,
+                disabled: !tieneAcceso,
+                children: modulo.children.map((hijo) => ({
+                    key: hijo.key,
+                    label: (
+                        <span style={{ color: tieneAcceso ? 'inherit' : '#aaa' }}>
+                            {hijo.label}
+                        </span>
+                    ),
+                    disabled: !hijo.planes.includes(planId),
+                })),
+            }
+        }
+
         return {
             key: modulo.key,
             icon: modulo.icon,
@@ -43,16 +72,29 @@ export default function DashboardLayout() {
                 </div>
             ),
             disabled: !tieneAcceso,
-            style: { opacity: tieneAcceso ? 1 : 0.5 },
         }
     })
 
     const onMenuClick = ({ key }: { key: string }) => {
-        const modulo = todosLosModulos.find(m => m.key === key)
+        // busca en módulos planos
+        let modulo = todosLosModulos.find(m => m.key === key)
+
+        // si no lo encuentra, busca dentro de los hijos
+        if (!modulo) {
+            for (const m of todosLosModulos) {
+                if (m.children) {
+                    const hijo = m.children.find((h: any) => h.key === key)
+                    if (hijo) {
+                        modulo = hijo
+                        break
+                    }
+                }
+            }
+        }
+
         if (modulo && !modulo.planes.includes(planId)) return
         navigate(key)
     }
-
     const planNombre: Record<number, string> = { 1: 'Básico', 2: 'Profesional', 3: 'Empresarial' }
     const planColor: Record<number, string> = { 1: 'default', 2: 'blue', 3: 'gold' }
 
@@ -88,7 +130,7 @@ export default function DashboardLayout() {
                         <div style={{ textAlign: 'center', fontSize: 22 }}>🏪</div>
                     ) : (
                         <div>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c' }}>🏪 Surtiana</div>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c' }}>Logo Empresa</div>
                             <Tag color={planColor[planId]} style={{ marginTop: 4, fontSize: 11 }}>
                                 Plan {planNombre[planId]}
                             </Tag>

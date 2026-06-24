@@ -7,11 +7,12 @@ import DashboardLayout from './shared/components/DashboardLayout'
 import DashboardPage from './modules/dashboard/DashboardPage'
 import ProtectedRoute from './router/ProtectedRoute'
 import InventarioPage from './modules/inventory/InventarioPage'
+import ProveedoresPage from './modules/purchases/ProveedoresPage'
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/planes" />} />
+      <Route path="/" element={<Navigate to="/login" />} />
       <Route path="/planes" element={<PlanesPage />} />
       <Route path="/registro" element={<RegistroPage />} />
       <Route path="/pago" element={<PagoPage />} />
@@ -23,7 +24,9 @@ function App() {
           <Route path="/ventas" element={<div>Módulo Ventas</div>} />
           <Route path="/inventario" element={<InventarioPage />} />
           <Route path="/clientes" element={<div>Módulo Clientes</div>} />
-          <Route path="/proveedores" element={<div>Módulo Proveedores</div>} />
+          <Route path="/compras/proveedores" element={<ProveedoresPage />} />
+          <Route path="/compras/ordenes" element={<div>Órdenes de compra — próximamente</div>} />
+          <Route path="/compras/cuentas-por-pagar" element={<div>Cuentas por pagar — próximamente</div>} />
           <Route path="/contabilidad" element={<div>Módulo Contabilidad</div>} />
           <Route path="/facturacion" element={<div>Módulo Facturación</div>} />
           <Route path="/nomina" element={<div>Módulo Nómina</div>} />

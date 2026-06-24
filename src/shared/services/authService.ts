@@ -3,6 +3,7 @@ import api from './api'
 export const authService = {
     registro: (data: {
         cedula: string
+        tipoDocumento: string
         nombre: string
         correo: string
         contrasena: string
@@ -24,4 +25,14 @@ export const authService = {
 
     resetPassword: (token: string, nuevaContrasena: string) =>
         api.post('/api/pos/usuario/reset-password', { token, nuevaContrasena }),
+
+    crearEmpleado: (data: {
+        cedula: string
+        tipoDocumento: string
+        nombre: string
+        correo: string
+        contrasena: string
+        telefono: string
+        rol: string
+    }) => api.post('/api/pos/usuario/crear-empleado', data),
 }

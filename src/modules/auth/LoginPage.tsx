@@ -11,33 +11,32 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [form] = Form.useForm()
 
-    const onFinish = async (values: any) => {
-        setLoading(true)
-        try {
-            const { data } = await authService.login(values.email, values.password)
+const onFinish = async (values: any) => {
+    setLoading(true)
+    try {
+        const { data } = await authService.login(values.email, values.password)
 
-            // decodifica el JWT
-            const decoded: any = jwtDecode(data)
+        const decoded: any = jwtDecode(data)
 
-            // guarda token y usuario en el store
-            const { setToken, setUsuario } = useAuthStore.getState()
-            setToken(data)
-            setUsuario({
-                cedula: decoded.cedula,
-                nombre: decoded.nombre,
-                correo: decoded.sub,
-                rol: decoded.rol,
-                planId: decoded.planId,
-            })
+        const { setToken, setUsuario } = useAuthStore.getState()
+        setToken(data)
+        setUsuario({
+            cedula: decoded.cedula,
+            nombre: decoded.nombre,
+            correo: decoded.sub,
+            rol: decoded.rol,
+            planId: decoded.planId,
+            empresaId: decoded.empresaId, // ← agrega esto
+        })
 
-            message.success(`¡Bienvenido ${decoded.nombre}!`)
-            navigate('/dashboard')
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Credenciales incorrectas')
-        } finally {
-            setLoading(false)
-        }
+        message.success(`¡Bienvenido ${decoded.nombre}!`)
+        navigate('/dashboard')
+    } catch (error: any) {
+        message.error(error.response?.data?.message || 'Credenciales incorrectas')
+    } finally {
+        setLoading(false)
     }
+}
     return (
         <div style={{ minHeight: '100vh', background: '#fff5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
             <div style={{ background: '#fff', borderRadius: 20, padding: '40px 48px', width: '100%', maxWidth: 420, boxShadow: '0 8px 32px rgba(231,76,60,0.10)', border: '1px solid #ffd5d5' }}>

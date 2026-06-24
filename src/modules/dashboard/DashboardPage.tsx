@@ -75,7 +75,7 @@ export default function DashboardPage() {
 
             {/* Alertas */}
             <Alert
-                message="8 productos tienen stock bajo — revisa el inventario"
+                title="8 productos tienen stock bajo — revisa el inventario"
                 type="warning"
                 icon={<WarningOutlined />}
                 showIcon
