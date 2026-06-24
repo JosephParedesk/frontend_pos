@@ -8,6 +8,8 @@ import DashboardPage from './modules/dashboard/DashboardPage'
 import ProtectedRoute from './router/ProtectedRoute'
 import InventarioPage from './modules/inventory/InventarioPage'
 import ProveedoresPage from './modules/purchases/ProveedoresPage'
+import ComprasPage from './modules/purchases/ComprasPage'
+import NuevaCompraPage from './modules/purchases/NuevaCompraPage'
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
           <Route path="/inventario" element={<InventarioPage />} />
           <Route path="/clientes" element={<div>Módulo Clientes</div>} />
           <Route path="/compras/proveedores" element={<ProveedoresPage />} />
+          <Route path="/compras" element={<ComprasPage />} />
+          <Route path="/compras/nueva" element={<NuevaCompraPage />} />
           <Route path="/compras/ordenes" element={<div>Órdenes de compra — próximamente</div>} />
           <Route path="/compras/cuentas-por-pagar" element={<div>Cuentas por pagar — próximamente</div>} />
           <Route path="/contabilidad" element={<div>Módulo Contabilidad</div>} />

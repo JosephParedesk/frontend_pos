@@ -22,6 +22,7 @@ const todosLosModulos = [
         label: 'Compras',
         planes: [2, 3],
         children: [
+            { key: '/compras', label: 'Compras y Gastos', planes: [2, 3] },
             { key: '/compras/proveedores', label: 'Proveedores', planes: [2, 3] },
             { key: '/compras/ordenes', label: 'Órdenes de compra', planes: [2, 3] },
             { key: '/compras/cuentas-por-pagar', label: 'Cuentas por pagar', planes: [2, 3] },
