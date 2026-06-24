@@ -65,6 +65,17 @@ export const productoService = {
 
   listarStockBajo: () =>
     api.get<Producto[]>('/api/surtiana/inventario/stock-bajo'),
+
+  // ── Subir imagen del producto (requiere endpoint multipart en el backend) ──
+  subirImagen: (sku: string, file: File) => {
+    const formData = new FormData()
+    formData.append('imagen', file)
+    return api.post<{ imagenUrl: string }>(
+      `/api/surtiana/inventario/${sku}/imagen`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+  },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,4 +84,4 @@ export const calcularGanancia = (precioCompra: number, precioVenta: number) => {
   const pesos = precioVenta - precioCompra
   const porcentaje = precioCompra > 0 ? (pesos / precioCompra) * 100 : 0
   return { pesos, porcentaje }
-} 
+}

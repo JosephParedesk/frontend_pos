@@ -10,15 +10,17 @@ import {
     ReloadOutlined, PercentageOutlined, DollarOutlined
 } from '@ant-design/icons'
 import type { UploadFile, UploadProps } from 'antd'
-import {
-    productoService, categoriaService, proveedorService,
-    calcularGanancia,
-} from '../../shared/services/inventarioService'
-import type { Producto, Categoria, Proveedor, ProductoRequest } from '../../shared/services/inventarioService'
-import { useAuthStore } from '../../shared/store/authStore'
+import { productoService, calcularGanancia } from '../../shared/services/inventarioService'
+import type { Producto, ProductoRequest } from '../../shared/services/inventarioService'
+import { proveedorService } from '../../shared/services/proveedorService'
+import type { Proveedor } from '../../shared/services/proveedorService'
+import { categoriaService } from '../../shared/services/categoriaService'
+import type { Categoria } from '../../shared/services/categoriaService'
 
 const UNIDADES = ['Unidad', 'Kilogramo', 'Litro', 'Caja', 'Paquete', 'Metro', 'Gramo', 'Mililitro']
-const COLORES_CATEGORIA = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#1abc9c', '#e91e63']
+
+// Emojis sugeridos para el ícono de categoría (campo "icono" del backend, texto libre)
+const ICONOS_SUGERIDOS = ['🥤', '🍞', '🧴', '📎', '💻', '🧀', '🥩', '🧹', '🚗', '👕', '💊', '🔧']
 
 // ─── Componente imagen producto ────────────────────────────────────────────────
 function ImagenProducto({ url, nombre }: { url?: string; nombre: string }) {
@@ -42,32 +44,33 @@ function ImagenProducto({ url, nombre }: { url?: string; nombre: string }) {
     )
 }
 
-// ─── Panel gestión de categorías ───────────────────────────────────────────────
+// ─── Panel gestión de categorías (microservicio real) ──────────────────────────
 function CategoriasPanel({
-    categorias, onActualizar
+    categorias, loading, onActualizar
 }: {
     categorias: Categoria[]
+    loading: boolean
     onActualizar: () => void
 }) {
     const [modalVisible, setModalVisible] = useState(false)
     const [editando, setEditando] = useState<Categoria | null>(null)
+    const [guardando, setGuardando] = useState(false)
     const [form] = Form.useForm()
-    const [loading, setLoading] = useState(false)
 
     const abrirModal = (cat?: Categoria) => {
         setEditando(cat || null)
-        form.setFieldsValue(cat || { color: '#e74c3c' })
+        form.setFieldsValue(cat || { activo: true, icono: '🏷️' })
         setModalVisible(true)
     }
 
     const guardar = async (values: any) => {
-        setLoading(true)
+        setGuardando(true)
         try {
             if (editando) {
                 await categoriaService.actualizar(editando.categoriaId, values)
                 message.success('Categoría actualizada')
             } else {
-                await categoriaService.guardar(values)
+                await categoriaService.guardar({ ...values, activo: true })
                 message.success('Categoría creada')
             }
             setModalVisible(false)
@@ -76,21 +79,20 @@ function CategoriasPanel({
         } catch (error: any) {
             message.error(error.response?.data?.message || 'Error al guardar la categoría')
         } finally {
-            setLoading(false)
+            setGuardando(false)
         }
     }
 
-    const eliminar = async (id: string) => {
+    const eliminar = async (id: number) => {
         try {
             await categoriaService.eliminar(id)
             message.success('Categoría eliminada')
             onActualizar()
         } catch {
-            message.error('No se pudo eliminar la categoría')
+            message.error('Error al eliminar la categoría')
         }
     }
 
-    console.log('categorias:', categorias)
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -108,23 +110,22 @@ function CategoriasPanel({
                 </Button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                 {categorias.map(cat => (
                     <div key={cat.categoriaId} style={{
                         background: '#fff', border: '1px solid #f0f0f0', borderRadius: 10,
                         padding: '12px 16px', display: 'flex', alignItems: 'center',
-                        justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                        justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                        opacity: cat.activo ? 1 : 0.5
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{
-                                width: 12, height: 12, borderRadius: '50%',
-                                background: cat.color || '#e74c3c', flexShrink: 0
-                            }} />
+                            <div style={{ fontSize: 20 }}>{cat.icono || '🏷️'}</div>
                             <div>
                                 <div style={{ fontWeight: 600, fontSize: 13, color: '#333' }}>{cat.nombre}</div>
                                 {cat.descripcion && (
                                     <div style={{ fontSize: 11, color: '#999' }}>{cat.descripcion}</div>
                                 )}
+                                {!cat.activo && <Tag color="default" style={{ fontSize: 10, marginTop: 2 }}>Inactiva</Tag>}
                             </div>
                         </div>
                         <Space size={4}>
@@ -144,6 +145,11 @@ function CategoriasPanel({
                         </Space>
                     </div>
                 ))}
+                {!loading && categorias.length === 0 && (
+                    <div style={{ color: '#999', fontSize: 13, padding: 16 }}>
+                        No hay categorías registradas todavía.
+                    </div>
+                )}
             </div>
 
             <Modal
@@ -165,25 +171,35 @@ function CategoriasPanel({
                     <Form.Item name="descripcion" label="Descripción (opcional)">
                         <Input placeholder="Descripción breve" style={{ borderRadius: 8 }} />
                     </Form.Item>
-                    <Form.Item name="color" label="Color identificador">
+                    <Form.Item name="icono" label="Ícono">
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {COLORES_CATEGORIA.map(c => (
+                            {ICONOS_SUGERIDOS.map(emoji => (
                                 <div
-                                    key={c}
-                                    onClick={() => form.setFieldValue('color', c)}
+                                    key={emoji}
+                                    onClick={() => form.setFieldValue('icono', emoji)}
                                     style={{
-                                        width: 28, height: 28, borderRadius: '50%', background: c,
-                                        cursor: 'pointer', border: form.getFieldValue('color') === c ? '3px solid #333' : '3px solid transparent',
-                                        transition: 'border 0.15s'
+                                        width: 34, height: 34, borderRadius: 8, fontSize: 18,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        cursor: 'pointer', border: '1px solid #f0f0f0', background: '#fafafa'
                                     }}
-                                />
+                                >
+                                    {emoji}
+                                </div>
                             ))}
                         </div>
                     </Form.Item>
+                    {editando && (
+                        <Form.Item name="activo" label="Estado">
+                            <Select>
+                                <Select.Option value={true}>Activa</Select.Option>
+                                <Select.Option value={false}>Inactiva</Select.Option>
+                            </Select>
+                        </Form.Item>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                         <Button onClick={() => { setModalVisible(false); form.resetFields() }}>Cancelar</Button>
                         <Button
-                            type="primary" htmlType="submit" loading={loading}
+                            type="primary" htmlType="submit" loading={guardando}
                             style={{ background: '#e74c3c', borderColor: '#e74c3c', borderRadius: 8 }}
                         >
                             {editando ? 'Guardar cambios' : 'Crear categoría'}
@@ -197,15 +213,13 @@ function CategoriasPanel({
 
 // ─── Página principal ──────────────────────────────────────────────────────────
 export default function InventarioPage() {
-    const { usuario } = useAuthStore()
-
     const [productos, setProductos] = useState<Producto[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [loading, setLoading] = useState(true)
-
+    const [loadingCategorias, setLoadingCategorias] = useState(true)
     const [busqueda, setBusqueda] = useState('')
-    const [filtroCat, setFiltroCat] = useState<string | undefined>()
+    const [filtroCat, setFiltroCat] = useState<number | undefined>()
     const [modalVisible, setModalVisible] = useState(false)
     const [editando, setEditando] = useState<Producto | null>(null)
     const [loadingModal, setLoadingModal] = useState(false)
@@ -219,43 +233,48 @@ export default function InventarioPage() {
 
     const ganancia = calcularGanancia(precioCompra, precioVenta)
 
-    // ── Carga datos del backend (solo cuando ya hay empresaId) ──
-    const cargarDatos = useCallback(async () => {
-        if (!usuario?.empresaId) return
+    // ── Carga de datos ──
+    const cargarProductos = useCallback(() => {
         setLoading(true)
-        try {
-            const [productosData, categoriasData, proveedoresData] = await Promise.all([
-                productoService.listar(),
-                categoriaService.listar(),
-                proveedorService.listar(),
-            ])
-            setProductos(productosData)
-            setCategorias(categoriasData)
-            setProveedores(proveedoresData)
-        } catch (error: any) {
-            message.error('Error al cargar el inventario')
-        } finally {
-            setLoading(false)
-        }
-    }, [usuario?.empresaId])
+        productoService.listar()
+            .then(({ data }) => setProductos(data))
+            .catch(() => message.error('Error al cargar los productos'))
+            .finally(() => setLoading(false))
+    }, [])
+
+    const cargarCategorias = useCallback(() => {
+        setLoadingCategorias(true)
+        categoriaService.listar()
+            .then(({ data }) => setCategorias(data))
+            .catch(() => message.error('Error al cargar las categorías'))
+            .finally(() => setLoadingCategorias(false))
+    }, [])
+
+    const cargarProveedores = useCallback(() => {
+        proveedorService.listar()
+            .then(({ data }) => setProveedores(data))
+            .catch(() => { /* no crítico para listar productos */ })
+    }, [])
 
     useEffect(() => {
-        cargarDatos()
-    }, [cargarDatos])
-    console.log('usuario en InventarioPage:', usuario)
+        cargarProductos()
+        cargarCategorias()
+        cargarProveedores()
+    }, [cargarProductos, cargarCategorias, cargarProveedores])
 
-    useEffect(() => {
-        if (usuario?.empresaId) {
-            cargarDatos()
-        }
-    }, [usuario?.empresaId, cargarDatos])
+    // ── Helpers de nombre por id ──
+    const nombreProveedor = (proveedorId?: string) =>
+        proveedores.find(p => String(p.proveedorId) === proveedorId)?.nombre
+
+    const categoriaDe = (categoriaId?: string) =>
+        categorias.find(c => String(c.categoriaId) === categoriaId)
+
     // ── Filtros ──
     const productosFiltrados = productos.filter(p => {
         const matchBusqueda = !busqueda ||
             p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-            p.sku.toLowerCase().includes(busqueda.toLowerCase()) ||
-            (p.categoriaNombre || '').toLowerCase().includes(busqueda.toLowerCase())
-        const matchCat = !filtroCat || p.categoriaId === filtroCat
+            p.sku.toLowerCase().includes(busqueda.toLowerCase())
+        const matchCat = !filtroCat || p.categoriaId === String(filtroCat)
         return matchBusqueda && matchCat
     })
 
@@ -265,7 +284,7 @@ export default function InventarioPage() {
     const valorInventario = productos.reduce((s, p) => s + p.precioVenta * p.stock, 0)
     const gananciaPotencial = productos.reduce((s, p) => s + (p.precioVenta - p.precioCompra) * p.stock, 0)
 
-    // ── Modal ──
+    // ── Modal producto ──
     const abrirModal = (producto?: Producto) => {
         setImagenPreview(undefined)
         setImagenFile(undefined)
@@ -274,7 +293,11 @@ export default function InventarioPage() {
             setEditando(producto)
             setPrecioCompra(producto.precioCompra)
             setPrecioVenta(producto.precioVenta)
-            form.setFieldsValue(producto)
+            form.setFieldsValue({
+                ...producto,
+                categoriaId: producto.categoriaId ? Number(producto.categoriaId) : undefined,
+                proveedorId: producto.proveedorId ? Number(producto.proveedorId) : undefined,
+            })
             if (producto.imagenUrl) setImagenPreview(producto.imagenUrl)
         } else {
             setEditando(null)
@@ -290,38 +313,39 @@ export default function InventarioPage() {
         setLoadingModal(true)
         try {
             const request: ProductoRequest = {
-                ...values,
+                sku: values.sku,
+                nombre: values.nombre,
+                descripcion: values.descripcion,
+                categoriaId: values.categoriaId != null ? String(values.categoriaId) : undefined,
+                proveedorId: values.proveedorId != null ? String(values.proveedorId) : undefined,
                 precioCompra: values.precioCompra || 0,
                 precioVenta: values.precioVenta || 0,
+                stock: values.stock || 0,
+                stockMinimo: values.stockMinimo || 0,
+                unidad: values.unidad,
+                activo: values.activo,
+                imagenUrl: editando?.imagenUrl,
             }
-
-            let skuFinal: string = values.sku
 
             if (editando) {
                 await productoService.actualizar(editando.sku, request)
-                skuFinal = editando.sku
+                message.success('Producto actualizado')
             } else {
-                const nuevo = await productoService.guardar(request)
-                skuFinal = nuevo.sku
+                await productoService.guardar(request)
+                message.success('Producto creado')
             }
 
             if (imagenFile) {
                 try {
-                    await productoService.subirImagen(skuFinal, imagenFile)
+                    await productoService.subirImagen?.(request.sku, imagenFile)
                 } catch {
-                    message.warning('Producto guardado pero no se pudo subir la imagen')
+                    message.warning('El producto se guardó, pero la imagen no se pudo subir')
                 }
             }
 
-            await cargarDatos()
-
-            message.success(editando ? 'Producto actualizado' : 'Producto creado')
             setModalVisible(false)
-            setImagenFile(undefined)
-            setImagenPreview(undefined)
-            setFileList([])
             form.resetFields()
-
+            cargarProductos()
         } catch (error: any) {
             message.error(error.response?.data?.message || 'Error al guardar el producto')
         } finally {
@@ -332,10 +356,10 @@ export default function InventarioPage() {
     const eliminarProducto = async (sku: string) => {
         try {
             await productoService.eliminar(sku)
-            setProductos(prev => prev.filter(p => p.sku !== sku))
             message.success('Producto eliminado')
+            cargarProductos()
         } catch {
-            message.error('No se pudo eliminar el producto')
+            message.error('Error al eliminar el producto')
         }
     }
 
@@ -381,13 +405,13 @@ export default function InventarioPage() {
             dataIndex: 'nombre',
             key: 'nombre',
             render: (v: string, record: Producto) => {
-                const prov = proveedores.find(p => p.proveedorId === record.proveedorId)
+                const prov = nombreProveedor(record.proveedorId)
                 return (
                     <div>
                         <div style={{ fontWeight: 600, color: '#333' }}>{v}</div>
                         {prov && (
                             <div style={{ fontSize: 11, color: '#999' }}>
-                                <ShopOutlined style={{ marginRight: 3 }} />{prov.nombre}
+                                <ShopOutlined style={{ marginRight: 3 }} />{prov}
                             </div>
                         )}
                     </div>
@@ -396,21 +420,14 @@ export default function InventarioPage() {
         },
         {
             title: 'Categoría',
-            dataIndex: 'categoriaNombre',
+            dataIndex: 'categoriaId',
             key: 'categoria',
-            render: (v: string, record: Producto) => {
-                const cat = categorias.find(c => c.categoriaId === record.categoriaId)
+            render: (categoriaId: string) => {
+                const cat = categoriaDe(categoriaId)
+                if (!cat) return <Tag style={{ borderRadius: 6 }}>Sin categoría</Tag>
                 return (
-                    <Tag
-                        style={{
-                            borderRadius: 6,
-                            background: (cat?.color || '#e74c3c') + '18',
-                            borderColor: cat?.color || '#e74c3c',
-                            color: cat?.color || '#e74c3c',
-                            fontWeight: 500
-                        }}
-                    >
-                        {cat?.nombre || v || 'Sin categoría'}
+                    <Tag style={{ borderRadius: 6, background: '#fff0f0', borderColor: '#ffd6d6', color: '#c0392b', fontWeight: 500 }}>
+                        {cat.icono ? `${cat.icono} ` : ''}{cat.nombre}
                     </Tag>
                 )
             }
@@ -517,7 +534,7 @@ export default function InventarioPage() {
                     </p>
                 </div>
                 <Space>
-                    <Button icon={<ReloadOutlined />} onClick={cargarDatos} style={{ borderRadius: 8 }}>
+                    <Button icon={<ReloadOutlined />} onClick={cargarProductos} style={{ borderRadius: 8 }}>
                         Actualizar
                     </Button>
                     <Button
@@ -533,7 +550,7 @@ export default function InventarioPage() {
             {/* Tarjetas resumen */}
             <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
                 <Col xs={12} sm={6}>
-                    <Card size="small" style={{ borderRadius: 10, borderColor: '#f0f0f0' }}>
+                    <Card size="small" style={{ borderRadius: 10, borderColor: '#ffe0e0' }}>
                         <Statistic
                             title="Productos activos"
                             value={productos.filter(p => p.activo).length}
@@ -543,7 +560,7 @@ export default function InventarioPage() {
                     </Card>
                 </Col>
                 <Col xs={12} sm={6}>
-                    <Card size="small" style={{ borderRadius: 10, borderColor: '#f0f0f0' }}>
+                    <Card size="small" style={{ borderRadius: 10, borderColor: '#ffe0e0' }}>
                         <Statistic
                             title="Stock bajo"
                             value={stockBajo.length}
@@ -553,18 +570,18 @@ export default function InventarioPage() {
                     </Card>
                 </Col>
                 <Col xs={12} sm={6}>
-                    <Card size="small" style={{ borderRadius: 10, borderColor: '#f0f0f0' }}>
+                    <Card size="small" style={{ borderRadius: 10, borderColor: '#ffe0e0' }}>
                         <Statistic
                             title="Valor inventario"
                             value={valorInventario}
-                            prefix={<DollarOutlined style={{ color: '#3498db' }} />}
+                            prefix={<DollarOutlined style={{ color: '#e74c3c' }} />}
                             formatter={v => `$${Number(v).toLocaleString('es-CO')}`}
-                            styles={{ content: { color: '#3498db', fontWeight: 700, fontSize: 15 } }}
+                            styles={{ content: { color: '#c0392b', fontWeight: 700, fontSize: 15 } }}
                         />
                     </Card>
                 </Col>
                 <Col xs={12} sm={6}>
-                    <Card size="small" style={{ borderRadius: 10, borderColor: '#f0f0f0' }}>
+                    <Card size="small" style={{ borderRadius: 10, borderColor: '#ffe0e0' }}>
                         <Statistic
                             title="Ganancia potencial"
                             value={gananciaPotencial}
@@ -604,9 +621,10 @@ export default function InventarioPage() {
                         ),
                         children: (
                             <div>
+                                {/* Filtros */}
                                 <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
                                     <Input
-                                        placeholder="Buscar por nombre, SKU o categoría..."
+                                        placeholder="Buscar por nombre o SKU..."
                                         prefix={<SearchOutlined style={{ color: '#e74c3c' }} />}
                                         value={busqueda}
                                         onChange={e => setBusqueda(e.target.value)}
@@ -619,14 +637,11 @@ export default function InventarioPage() {
                                         value={filtroCat}
                                         onChange={setFiltroCat}
                                         style={{ width: 200, borderRadius: 8 }}
-                                    >
-                                        {categorias.map(c => (
-                                            <Select.Option key={c.categoriaId} value={c.categoriaId}>
-                                                <span style={{ color: c.color, marginRight: 6 }}>●</span>
-                                                {c.nombre}
-                                            </Select.Option>
-                                        ))}
-                                    </Select>
+                                        options={categorias.map(c => ({
+                                            value: c.categoriaId,
+                                            label: `${c.icono ? c.icono + ' ' : ''}${c.nombre}`
+                                        }))}
+                                    />
                                 </div>
 
                                 <Table
@@ -653,14 +668,15 @@ export default function InventarioPage() {
                         children: (
                             <CategoriasPanel
                                 categorias={categorias}
-                                onActualizar={cargarDatos}
+                                loading={loadingCategorias}
+                                onActualizar={cargarCategorias}
                             />
                         )
                     }
                 ]}
             />
 
-            {/* Modal crear/editar producto */}
+            {/* ── Modal crear/editar producto ── */}
             <Modal
                 title={
                     <span style={{ color: '#c0392b', fontWeight: 700 }}>
@@ -674,6 +690,7 @@ export default function InventarioPage() {
                 destroyOnHidden
             >
                 <Form form={form} layout="vertical" onFinish={guardarProducto} style={{ marginTop: 12 }}>
+                    {/* Imagen */}
                     <Form.Item label="Imagen del producto">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div style={{
@@ -702,14 +719,21 @@ export default function InventarioPage() {
 
                     <Divider style={{ margin: '8px 0 16px' }} />
 
+                    {/* SKU + Categoría */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <Form.Item name="sku" label="SKU" rules={[{ required: true, message: 'Requerido' }]}>
                             <Input placeholder="PRD-001" style={{ borderRadius: 8 }} disabled={!!editando} />
                         </Form.Item>
-                        <Form.Item name="categoriaId" label="Categoría" rules={[{ required: true, message: 'Requerido' }]}>
+                        <Form.Item name="categoriaId" label="Categoría">
                             <Select
                                 placeholder="Selecciona categoría"
-                                popupRender={menu => (
+                                allowClear
+                                loading={loadingCategorias}
+                                options={categorias.filter(c => c.activo).map(c => ({
+                                    value: c.categoriaId,
+                                    label: `${c.icono ? c.icono + ' ' : ''}${c.nombre}`
+                                }))}
+                                dropdownRender={menu => (
                                     <>
                                         {menu}
                                         <Divider style={{ margin: '4px 0' }} />
@@ -721,37 +745,35 @@ export default function InventarioPage() {
                                         </div>
                                     </>
                                 )}
-                            >
-                                {categorias.map(c => (
-                                    <Select.Option key={c.categoriaId} value={c.categoriaId}>
-                                        <span style={{ color: c.color, marginRight: 6 }}>●</span>
-                                        {c.nombre}
-                                    </Select.Option>
-                                ))}
-                            </Select>
+                            />
                         </Form.Item>
                     </div>
 
+                    {/* Nombre */}
                     <Form.Item name="nombre" label="Nombre del producto" rules={[{ required: true, message: 'Requerido' }]}>
                         <Input placeholder="Ej: Coca Cola 350ml" style={{ borderRadius: 8 }} />
                     </Form.Item>
 
+                    {/* Descripción */}
                     <Form.Item name="descripcion" label="Descripción (opcional)">
                         <Input.TextArea rows={2} placeholder="Descripción del producto" style={{ borderRadius: 8 }} />
                     </Form.Item>
 
+                    {/* Proveedor */}
                     <Form.Item name="proveedorId" label="Proveedor">
-                        <Select placeholder="Selecciona el proveedor que lo vendió" allowClear>
-                            {proveedores.map(p => (
-                                <Select.Option key={p.proveedorId} value={p.proveedorId}>
-                                    <ShopOutlined style={{ marginRight: 6, color: '#888' }} />
-                                    {p.nombre}
-                                    {p.nit && <span style={{ color: '#bbb', marginLeft: 8, fontSize: 11 }}>NIT: {p.nit}</span>}
-                                </Select.Option>
-                            ))}
-                        </Select>
+                        <Select
+                            placeholder="Selecciona el proveedor que lo vendió"
+                            allowClear
+                            showSearch
+                            optionFilterProp="label"
+                            options={proveedores.filter(p => p.activo).map(p => ({
+                                value: p.proveedorId,
+                                label: `${p.nombre} · NIT: ${p.nit}`
+                            }))}
+                        />
                     </Form.Item>
 
+                    {/* Precios y ganancia */}
                     <div style={{
                         background: '#fafafa', border: '1px solid #f0f0f0',
                         borderRadius: 10, padding: '14px 16px', marginBottom: 16
@@ -764,8 +786,6 @@ export default function InventarioPage() {
                                 <InputNumber
                                     placeholder="0"
                                     style={{ width: '100%', borderRadius: 8 }}
-                                    formatter={v => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                                    parser={v => v ? Number(v.replace(/\$\s?|(\.)/g, '').replace(',', '.')) : 0}
                                     min={0}
                                     onChange={v => setPrecioCompra(Number(v) || 0)}
                                 />
@@ -774,8 +794,6 @@ export default function InventarioPage() {
                                 <InputNumber
                                     placeholder="0"
                                     style={{ width: '100%', borderRadius: 8 }}
-                                    formatter={v => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                                    parser={v => v ? Number(v.replace(/\$\s?|(\.)/g, '').replace(',', '.')) : 0}
                                     min={0}
                                     onChange={v => setPrecioVenta(Number(v) || 0)}
                                 />
@@ -798,8 +816,8 @@ export default function InventarioPage() {
                                         fontWeight: 700, fontSize: 15,
                                         color: ganancia.pesos >= 0 ? '#52c41a' : '#e74c3c'
                                     }}>
-                                        {ganancia.pesos >= 0
-                                            ? `+$${ganancia.pesos.toLocaleString('es-CO')}`
+                                        {ganancia.pesos >= 0 ? '+' : ''}{ganancia.pesos >= 0
+                                            ? `$${ganancia.pesos.toLocaleString('es-CO')}`
                                             : `-$${Math.abs(ganancia.pesos).toLocaleString('es-CO')}`
                                         }
                                     </span>
@@ -815,6 +833,7 @@ export default function InventarioPage() {
                         )}
                     </div>
 
+                    {/* Stock + Unidad */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                         <Form.Item name="stock" label="Stock actual" rules={[{ required: true, message: 'Requerido' }]}>
                             <InputNumber placeholder="0" style={{ width: '100%', borderRadius: 8 }} min={0} />
@@ -829,6 +848,7 @@ export default function InventarioPage() {
                         </Form.Item>
                     </div>
 
+                    {/* Estado */}
                     <Form.Item name="activo" label="Estado" initialValue={true}>
                         <Select>
                             <Select.Option value={true}>Activo</Select.Option>
